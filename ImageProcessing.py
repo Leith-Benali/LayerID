@@ -39,11 +39,11 @@ def thresh_callback(img, threshold, flake_name, masking, master_cat_file, cluste
     contours, _ = cv.findContours(canny_output, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     # loop through the contours to get rid of ones that are to small
-    smallest_contour = 1000
+    smallest_box = 1000
     result = []
     for i, cnt in enumerate(contours):
         x, y, w, h = cv.boundingRect(contours[i])
-        if w*h > smallest_contour:
+        if w*h > smallest_box:
             result.append(cnt)
     contours = result
 
