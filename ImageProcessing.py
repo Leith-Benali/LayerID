@@ -39,10 +39,11 @@ def thresh_callback(img, threshold, flake_name, masking, master_cat_file, cluste
     contours, _ = cv.findContours(canny_output, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     # loop through the contours to get rid of ones that are to small
-    smallest_contour = 50
+    smallest_contour = 1000
     result = []
     for i, cnt in enumerate(contours):
-        if cv.contourArea(cnt) > smallest_contour:
+        x, y, w, h = cv.boundingRect(contours[i])
+        if w*h > smallest_contour:
             result.append(cnt)
     contours = result
 
@@ -100,7 +101,7 @@ img_directory = "Graphene_Raw_Images"
 for filename in os.listdir(img_directory):
     img = os.path.join(img_directory, filename)
     thresh_callback(img,
-                    threshold=0,
+                    threshold=2,
                     flake_name="Khang",
                     masking=[[0, 1, 0, 1]],
                     master_cat_file=".\\Monolayer Search\\Graphene_on_SiO2_master_catalog.npz",
