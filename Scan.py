@@ -23,9 +23,11 @@ import threading
 import math
 import sqlite3            as sql
 import matplotlib.patches as patches
+from typing import List, Tuple
 
+from hardware_code.MicroscopeControl import MicroscopeController
 
-from MicroscopeControl  import MicroscopeController
+#from MicroscopeControl  import MicroscopeController
 from scipy.optimize     import curve_fit
 from matplotlib.patches import Rectangle
 from Progress           import ProgressBar
@@ -47,7 +49,7 @@ def preprocess(args_specification):
 		if 'type' in spec:
 			spec['type'] = types[spec['type']]
 		parser.add_argument(
-			*argument['names'],
+			*argument['names'], 
 			**spec
 		)
 
@@ -126,7 +128,6 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 	# of each image that has contrast greater than zero.
 	x, y    = 0, 0
 	regions = []
-	region_masks = []
 	pixel_coordinates = [] # DEBUG
 	while x < coarse_w - (fine_w / 2):
 		while y < coarse_h - (fine_h / 2):
@@ -139,16 +140,14 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 			x_high = int(round((x + fine_w) / mm_per_pixel)) + 1
 
 			subimage   = contrast[y_low:y_high, x_low:x_high]
-			if subimage < 0:
-				subimage = -subimage
 			relevant   = (subimage >= args.contrast_range[0]) & (subimage <= args.contrast_range[1])
 			r          = subimage.copy()
 
-			# The halo effect around flakes causes problems when attempting to identify flake
+			# The halo effect around flakes causes problems when attempting to identify flake 
 			# thickness. The halo around a flake tends to smoothly transition between the optical
 			# contrast of the flake itself and the substrate. This results in 1-5 pixels around the
 			# flake that appear to have lower optical contrast but aren't actually real. The erode
-			# and dilate process below tends to eliminate the halo pixels that contain incorrect
+			# and dilate process below tends to eliminate the halo pixels that contain incorrect 
 			# contrast values.
 			r[relevant]          = 1.0
 			r[relevant == False] = 0.0
@@ -164,7 +163,6 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 				x_shift = (coarse_w - fine_w) / 2
 				y_shift = (coarse_h - fine_h) / 2
 				regions.append([x + x0 - x_shift, y + y0 - y_shift])
-				region_masks.append(dilated)
 				# code.interact(local=locals())
 
 			y += fine_h
@@ -176,10 +174,10 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 		rect_color = contrast.max() * 2
 		for rect in pixel_coordinates:
 			timg = cv2.rectangle(
-				timg,
-				(rect[0], rect[2]),
-				(rect[1], rect[3]),
-				(rect_color, 0, 0),
+				timg, 
+				(rect[0], rect[2]), 
+				(rect[1], rect[3]), 
+				(rect_color, 0, 0), 
 				3
 			)
 		_min = timg.min()
@@ -189,14 +187,14 @@ def getRegionsOfInterest(img, bg, args, x0, y0):
 		cv2.imshow('Scan Preview', pv)
 		cv2.waitKey(1)
 
-	return regions, region_masks
+	return regions
 
 def parabolicSubtract(img, n_fit=128):
 	def fit(X, mmx, mmy, mx, my, b):
 		y, x = X
 		return mmx*x**2 + mmy*y**2 + mx*x + my*y + b
 
-	# Select a random subset of the image pixels to perform the fit on. This will be too slow
+	# Select a random subset of the image pixels to perform the fit on. This will be too slow 
 	# otherwise.
 	fit_x = np.random.randint(0, img.shape[1], (n_fit, ))
 	fit_y = np.random.randint(0, img.shape[0], (n_fit, ))
@@ -233,18 +231,18 @@ def plotImage(img, ds=20):
 
 def calculateBackgroundGreyscale(args, focus_interp, microscope):
 	x_min, x_max, y_min, y_max = args.bounds
-	# After initial testing I realized that this system produces a background that cannot be
-	# approximated as a simple function when the zoom is not very close to being maxed out. As a
+	# After initial testing I realized that this system produces a background that cannot be 
+	# approximated as a simple function when the zoom is not very close to being maxed out. As a 
 	# result, it's necessary to determine this background before taking serious images. In order
-	# to do this, we take many images at random positions, perform a rolling ball background
-	# subtraction and then take an average of them to get the background. The rolling ball
-	# algorithm tends to produce some irregularities around flakes, so we won't take a regular
+	# to do this, we take many images at random positions, perform a rolling ball background 
+	# subtraction and then take an average of them to get the background. The rolling ball 
+	# algorithm tends to produce some irregularities around flakes, so we won't take a regular 
 	# average. Instead we will take the standard deviation of each pixel across images and throw
 	# out values that are far outside of the mean.
 	n_background_images = args.n_background_images
 	bg_img_progress = ProgressBar("Background Images", 18, n_background_images, 1, ea=10)
 	positions           = np.array([
-		np.random.uniform(x_min, x_max, n_background_images),
+		np.random.uniform(x_min, x_max, n_background_images), 
 		np.random.uniform(y_min, y_max, n_background_images)
 	])
 	images = []
@@ -266,7 +264,7 @@ def calculateBackgroundGreyscale(args, focus_interp, microscope):
 		mask         = np.abs(img - means) < 1.2 * stds
 		weight       = np.ones(mask.shape) * 0.001
 		weight[mask] = 1.0
-		weights.append(weight)
+		weights.append(weight) 
 
 	weights    = np.stack(weights, axis=2)
 	background = np.average(imgs, axis=2, weights=weights)
@@ -280,20 +278,20 @@ def calculateBackgroundGreyscale(args, focus_interp, microscope):
 	# code.interact(local=locals())
 	return background
 
-def calculateBackgroundColored(args, focus_interp, microscope, std_threshold=1.2):
+def calculateBackgroundColored(args, focus_interp, microscope):
 	x_min, x_max, y_min, y_max = args.bounds
-	# After initial testing I realized that this system produces a background that cannot be
-	# approximated as a simple function when the zoom is not very close to being maxed out. As a
+	# After initial testing I realized that this system produces a background that cannot be 
+	# approximated as a simple function when the zoom is not very close to being maxed out. As a 
 	# result, it's necessary to determine this background before taking serious images. In order
-	# to do this, we take many images at random positions, perform a rolling ball background
-	# subtraction and then take an average of them to get the background. The rolling ball
-	# algorithm tends to produce some irregularities around flakes, so we won't take a regular
+	# to do this, we take many images at random positions, perform a rolling ball background 
+	# subtraction and then take an average of them to get the background. The rolling ball 
+	# algorithm tends to produce some irregularities around flakes, so we won't take a regular 
 	# average. Instead we will take the standard deviation of each pixel across images and throw
 	# out values that are far outside of the mean.
 	n_background_images = args.n_background_images
 	bg_img_progress = ProgressBar("Background Images", 18, n_background_images, 1, ea=10)
 	positions           = np.array([
-		np.random.uniform(x_min, x_max, n_background_images),
+		np.random.uniform(x_min, x_max, n_background_images), 
 		np.random.uniform(y_min, y_max, n_background_images)
 	])
 	images = []
@@ -323,21 +321,21 @@ def calculateBackgroundColored(args, focus_interp, microscope, std_threshold=1.2
 	weights_g = []
 	weights_b = []
 	for img_r, img_g, img_b in zip(imgs_r_arr, imgs_g_arr, imgs_b_arr):
-		mask_r       = np.abs(img_r - means_r) < std_threshold * stds_r
-		mask_g       = np.abs(img_g - means_g) < std_threshold * stds_g
-		mask_b       = np.abs(img_b - means_b) < std_threshold * stds_b
+		mask_r       = np.abs(img_r - means_r) < 1.2 * stds_r
+		mask_g       = np.abs(img_g - means_g) < 1.2 * stds_g
+		mask_b       = np.abs(img_b - means_b) < 1.2 * stds_b
 
 		weight_r         = np.ones(mask_r.shape) * 0.001
 		weight_r[mask_r] = 1.0
-		weights_r.append(weight_r)
+		weights_r.append(weight_r) 
 
 		weight_g         = np.ones(mask_g.shape) * 0.001
 		weight_g[mask_g] = 1.0
-		weights_g.append(weight_g)
+		weights_g.append(weight_g) 
 
 		weight_b         = np.ones(mask_b.shape) * 0.001
 		weight_b[mask_b] = 1.0
-		weights_b.append(weight_b)
+		weights_b.append(weight_b) 
 
 	weights_r    = np.stack(weights_r, axis=2)
 	background_r = np.average(imgs_r, axis=2, weights=weights_r)
@@ -379,7 +377,7 @@ def validateArgs(args):
 				else:
 					args_file[k] = v
 	else:
-		args_file = args.__dict__
+		args_file = args.__dict__		
 
 	# Ensure that all required arguments are specified.
 	def isNoneOrMissing(d, key):
@@ -404,6 +402,15 @@ def validateArgs(args):
 				raise Exception("layer_range was specified but material_file was not.")
 
 	return type("arg_dictionary", (object,), args_file)
+
+
+def do_something(items: List[str]) -> Tuple[int, int]:
+	"""
+	This function finds the minimum and maximum length string in the supplied list.
+	:param items: A list of strings.
+	:return: The minimum and maximum lengths.
+	"""
+	return min(len(i) for i in items), max(len(i) for i in items)
 
 
 if __name__ == '__main__':
@@ -433,7 +440,7 @@ if __name__ == '__main__':
 
 		# We need to iterate over the "layers" member of this file and find the values corresponding
 		# to the layer numbers specified by the user. Next we need to calculate how the RGB contrast
-		# values should appear in a greyscale image. This is based on the way openCV converts
+		# values should appear in a greyscale image. This is based on the way openCV converts 
 		# RGB images to greyscale.
 		layers = material_file['layers']
 		temp   = []
@@ -446,9 +453,9 @@ if __name__ == '__main__':
 		min_val = [line[-1] for line in layers if line[0] == args.layer_range[0]][0]
 		max_val = [line[-1] for line in layers if line[0] == args.layer_range[1]][0]
 
-		# We now have the absolute contrast value of the requested layer numbers. We want to
+		# We now have the absolute contrast value of the requested layer numbers. We want to 
 		# add a reasonable buffer zone around this value though, because the image will never
-		# be exact. In order to do this we'll add half the average distance between layers
+		# be exact. In order to do this we'll add half the average distance between layers 
 		# as a buffer.
 		_buffer = np.ediff1d([i[-1] for i in layers]).mean() / 2
 		min_val -= _buffer
@@ -471,8 +478,8 @@ if __name__ == '__main__':
 	if args.material_file is not None:
 		process_images = True
 		imageProcessor = MultiProcessImageProcessor(
-			[args.fine_zoom[2], args.fine_zoom[1]],
-			args.n_processes,
+			[args.fine_zoom[2], args.fine_zoom[1]], 
+			args.n_processes, 
 			meta_data
 		)
 		print("Initialized image processor")
@@ -496,7 +503,6 @@ if __name__ == '__main__':
 						break
 					else:
 						exit()
-
 
 	skip_focus   = False
 	focus_params = None
@@ -553,7 +559,7 @@ if __name__ == '__main__':
 	microscope.stage.setAcceleration(10, 10)
 	microscope.stage.setMaxSpeed(7.5, 7.5)
 
-	# Now we perform the focus calibration for the coarse scan.
+	# Now we perform the focus calibration for the coarse scan. 
 	microscope.camera.setExposure(coarse_exposure)
 	microscope.focus.setZoom(coarse_zoom)
 
@@ -674,20 +680,20 @@ if __name__ == '__main__':
 		else:
 			def inner_condition():
 				return inner_current < inner_max + inner_width
-
+				
 
 	# The initial position of the stage before the loop starts will depend on whether or not we
 	# need to swap the direction of the inner loop.
 	if swap:
 		microscope.stage.moveTo(inner_current, outer_current)
 		microscope.focus.setFocus(
-			interp((inner_current, outer_current)),
+			interp((inner_current, outer_current)), 
 			corrected=True
 		)
 	else:
 		microscope.stage.moveTo(outer_current, inner_current)
 		microscope.focus.setFocus(
-			interp((outer_current, inner_current)),
+			interp((outer_current, inner_current)), 
 			corrected=True
 		)
 
@@ -703,16 +709,9 @@ if __name__ == '__main__':
 	coarse_progress = ProgressBar("Coarse Scan", 18, n_coarse_images, 1, ea=20)
 
 	regions_of_interest  = []
-	masks = []
-
-	# os.path.join(args.output_directory, "_fine_background.png")
-	flake_masks_directory = os.path.join(args.output_directory, "flake_masks")
-	if not os.path.isdir(flake_masks_directory):
-		os.mkdir(flake_masks_directory)
 
 	while outer_current < outer_max + outer_width:
 		row_regions_of_interest = []
-		row_masks = []
 		while inner_condition():
 			x, y = microscope.stage.getPosition()
 			img  = avgimg(args.coarse_averages, args.coarse_downscale)
@@ -720,31 +719,28 @@ if __name__ == '__main__':
 				pv   = cv2.resize(img, (0, 0), fx=0.3, fy=0.3)
 				cv2.imshow('Scan Preview', pv)
 				cv2.waitKey(1)
-
+			
 			# This function will return the coordinates of all of the regions within this image that
 			# contain potentially interesting flakes.
-			regions, masks = getRegionsOfInterest(img, coarse_background, args, x, y)
-			row_regions_of_interest.extend(regions)
-			row_masks.extend(masks)
+			row_regions_of_interest.extend(getRegionsOfInterest(img, coarse_background, args, x, y))
 
 			inner_current += sign*inner_width
 			if swap:
 				microscope.stage.moveTo(inner_current, outer_current)
 				microscope.focus.setFocus(
-					interp((inner_current, outer_current)),
+					interp((inner_current, outer_current)), 
 					corrected=args.quality_focus
 				)
 			else:
 				microscope.stage.moveTo(outer_current, inner_current)
 				microscope.focus.setFocus(
-					interp((outer_current, inner_current)),
+					interp((outer_current, inner_current)), 
 					corrected=args.quality_focus
 				)
 			image_number += 1
 			coarse_progress.update(image_number)
 
 		regions_of_interest.append(row_regions_of_interest)
-		masks.append(row_masks)
 		inner_current  = outer_reset
 		outer_current += outer_width
 		if swap:
@@ -805,8 +801,8 @@ if __name__ == '__main__':
 	#############################################
 
 	image_idx = 0
-	# We've finished the coarse scan. Now we'll zoom into the regions of interest that we found.
-	for row, row_masks in zip(regions_of_interest, masks):
+	# We've finished the coarse scan. Now we'll zoom into the regions of interest that we found. 
+	for row in regions_of_interest:
 		if len(row) < 1:
 			continue
 		x0, y0 = row[0]
@@ -815,7 +811,7 @@ if __name__ == '__main__':
 			interp((x0, y0)),
 			corrected=True
 		)
-		for (x, y), mask in zip(row, row_masks):
+		for x, y in row:
 			microscope.stage.moveTo(x, y)
 			microscope.focus.setFocus(
 				interp((x, y)),
@@ -826,7 +822,7 @@ if __name__ == '__main__':
 			fstr = "%04d_%2.4f_%2.4f.png"%(image_idx, x, y)
 			meta_data['image_files'].append({
 				'path'     : fstr,
-				'position' : [x, y]
+				'position' : [x, y]	
 			})
 
 			filename = os.path.join(
@@ -834,18 +830,11 @@ if __name__ == '__main__':
 				fstr
 			)
 
-			mask_filename = os.path.join(
-				flake_masks_directory,
-				fstr.replace(".png", ".npy")
-			)
-
-			np.save(mask_filename, mask)
-
 			cv2.imwrite(filename, img)
 			image_idx += 1
 
 			if process_images:
-				# The fine background as determined by this program needs to be supplied to the
+				# The fine background as determined by this program needs to be supplied to the 
 				# image processor so it can correctly calculate optical contrast values.
 				imageProcessor.addItem(filename, fine_background, args)
 				#pass
@@ -892,11 +881,7 @@ if __name__ == '__main__':
 		except Exception as ex:
 			code.interact(local=locals())
 
-	MultiProcessImageProcessor(
-		[args.fine_zoom[2], args.fine_zoom[1]],
-		args.n_processes,
-		meta_data
-	).buildDatabase(args)
+	imageProcessor.buildDatabase(args)
 
 	print("Copying the most relevant files into a subdirectory . . . ")
 	dbname = os.path.join(args.output_directory, "_database.db")
@@ -910,7 +895,7 @@ if __name__ == '__main__':
 	filter_stmt = "WHERE L001_area > 25 order by L001_area DESC"
 	stmt        = "SELECT file FROM flakes " + filter_stmt
 	print("Filtering images with \"%s\""%stmt)
-	res = list(cur.execute(stmt))
+	res = cur.execute(stmt)
 	for i, row in enumerate(res):
 		outfile = "%06d_%s"%(i, row[0])
 		outfile = os.path.join(subdir, outfile)
@@ -918,10 +903,7 @@ if __name__ == '__main__':
 		infile = os.path.join(args.output_directory, row[0])
 		copyfile(infile, outfile)
 
-	print("Copied %d files to %s" % (len(res), subdir))
+	print("Copied %d files to %s"%(i, subdir))
 
 	microscope.camera.endCapture()
 	cv2.destroyAllWindows()
-
-	# Sample parameters
-	# python Scan.py -f 1.0 0.39055 0.32674 0.0115 -c 0.33 1.39249 1.16496 0.0018 -b -5.0 -1.0 -1.0 3.0 --contrast-range 0.01 1 --output whatever1 --preview

@@ -1,0 +1,213 @@
+{
+	"description" : "Scans the specified area of a substrate at low zoom in order to determine regions of interest. Zooms into these regions of interest, refines the focus of the camera and takes multiple images and averages them together to produce high quality images of areas of the substrate that contain flakes.",
+	"arguments" : [
+		{
+			"names" : ["-A", "--args-file"],
+			"spec"  : {
+				"dest"     : "args_file",
+				"type"     : "str",
+				"default"  : null,
+				"help"     : "File containing values to use for arguments to this program. This is useful for saving certain command line arguments that are used frequently so that they do not need to be re-typed. This file must be a flat dictionary (in JSON format) where each key corresponds to the name of a command line argument and each value corresponds to what it should be set too. Values specified at the command line will override values in this file. See _Scan.json for argument names. The \"dest\" field in each argument is the name that should be used."
+			}
+		},
+		{
+			"names" : ["-op", "--optical-parameters"],
+			"spec"  : {
+				"dest"     : "material_file",
+				"type"     : "str",
+				"default"  : null,
+				"help"     : "A file containing information about the expected optical contrast of the material being imaged. If this file is not specified, the images taken by this program will not be processed and you'll have to run the processing code separately. See calibration_data/_graphene_on_90nmSiO2_Silicon.json for an example of what this file should look like. These files can be generated with the MonolayerContrastCalculator program (in a separate repository)."
+			}
+		},
+		{
+			"names" : ["-np", "--n-processes"],
+			"spec"  : {
+				"dest"     : "n_processes",
+				"type"     : "int",
+				"default"  : 1,
+				"help"     : "The number of processes to use when processing images. This value is ignored if no optical paramters are specified (since images won't be processed)."
+			}
+		},
+		{
+			"names" : ["-o", "--output"],
+			"spec"  : {
+				"dest"     : "output_directory",
+				"type"     : "str",
+				"required" : true,
+				"help"     : "The directory to write output files to. It will be created if it does not exist. This program will not write into a folder that is not empty."
+			}
+		},
+		{
+			"names" : ["-b", "--bounds"],
+			"spec"  : {
+				"dest"     : "bounds",
+				"nargs"    : 4,
+				"type"     : "float",
+				"required" : true,
+				"help"     : "The stage coordinates to scan over. The format is 'x_min x_max y_min y_max'"
+			}
+		},
+		{
+			"names" : ["-F", "--focus-points"],
+			"spec"  : {
+				"dest"     : "focus_points",
+				"nargs"    : "*",
+				"type"     : "float",
+				"default"  : null,
+				"help"     : "A list of coordinates in the sample to autofocus on before performing the scan. These points are used to fit the focus as a function of coordinates to a plane. This plane is then interpolated over to adjust the focus when taking images."
+			}
+		},
+		{
+			"names" : ["-f", "--fine-zoom"],
+			"spec"  : {
+				"dest"     : "fine_zoom",
+				"nargs"    : 4,
+				"type"     : "float",
+				"required" : false,
+				"default"  : null,
+				"help"     : "The zoom to use when taking high quality images of interesting areas. The height and width of an image in real coordinates is also needed. The format for this argument is 'zoom image_width image_height exposure'. Zoom is real number between 0 and 1 where 0 is the lowest zoom and 1 is the highest zoom. width and height are in millimeters. Exposure is in seconds."
+			}
+		},
+		{
+			"names" : ["-fa", "--fine-averages"],
+			"spec"  : {
+				"dest"     : "fine_averages",
+				"type"     : "int",
+				"default"  : 3,
+				"help"     : "The number of images to average together when taking zoomed in images."
+			}
+		},
+		{
+			"names" : ["-c", "--coarse-zoom"],
+			"spec"  : {
+				"dest"     : "coarse_zoom",
+				"nargs"    : 4,
+				"type"     : "float",
+				"required" : false,
+				"default"  : null,
+				"help"     : "The zoom to use when taking low quality images to find interesting areas. The height and width of an image in real coordinates is also needed. The format for this argument is 'zoom image_width image_height exposure'. Zoom is real number between 0 and 1 where 0 is the lowest zoom and 1 is the highest zoom. width and height are in millimeters. Exposure is in seconds."
+			}
+		},
+		{
+			"names" : ["-ca", "--coarse-averages"],
+			"spec"  : {
+				"dest"     : "coarse_averages",
+				"type"     : "int",
+				"default"  : 1,
+				"help"     : "The number of images to average together when taking zoomed out images."
+			}
+		},
+		{
+			"names" : ["-cd", "--coarse-downscale"],
+			"spec"  : {
+				"dest"     : "coarse_downscale",
+				"type"     : "int",
+				"default"  : 2,
+				"help"     : "The factor to downscale coarse images by before processing. This improves performance."
+			}
+		},
+		{
+			"names" : ["-fr", "--focus-range"],
+			"spec"  : {
+				"dest"     : "focus_range",
+				"nargs"    : 2,
+				"type"     : "float",
+				"default"  : [0.45, 0.55],
+				"help"     : "The range of values to sweep when focusing the camera. This can often be the current focal point +/- 0.05. Only very uneven or very large samples will have their focal points vary by more than that."
+			}
+		},
+		{
+			"names" : ["-qf", "--quality-focus"],
+			"spec"  : {
+				"dest"     : "quality_focus",
+				"action"   : "store_true",
+				"help"     : "Perform a more careful movement of the focus lens when refocusing the camera for each image. This is VERY expensive in terms of time, but it may improve image quality if the focus motor is misbehaving."
+			}
+		},
+		{
+			"names" : ["-p", "--preview"],
+			"spec"  : {
+				"dest"     : "preview",
+				"action"   : "store_true",
+				"help"     : "Show a preview of the flake identification process during the coarse scan. Rendering this preview takes significant CPU resources and can cause a scan to run more slowly."
+			}
+		},
+		{
+			"names" : ["-tr", "--threshold-ratio"],
+			"spec"  : {
+				"dest"     : "threshold_ratio",
+				"type"     : "float",
+				"default"  : 0.005,
+				"help"     : "This is the minimum ratio of area containing flakes to area not containing flakes in a region necessary for it to be labelled a region of interest and scanned carefully."
+			}
+		},
+		{
+			"names" : ["-cr", "--contrast-range"],
+			"spec"  : {
+				"dest"     : "contrast_range",
+				"nargs"    : 2,
+				"type"     : "float",
+				"required" : false,
+				"default"  : null,
+				"help"     : "Pixels with a contrast value in this range are counted when determining the percentage of an image that contains relevant material."
+			}
+		},
+		{
+			"names" : ["-lr", "--layer-range"],
+			"spec"  : {
+				"dest"     : "layer_range",
+				"nargs"    : 2,
+				"type"     : "int",
+				"required" : false,
+				"default"  : null,
+				"help"     : "The range of flake layers to consider when determining regions of interest during the coarse scan. For this parameter to be valid, an optical parameters file must be specified. This file will be used to convert the specified layer range into a valid range of optical contrast values."
+			}
+		},
+		{
+			"names" : ["-ap", "--autofocus-parameters"],
+			"spec"  : {
+				"dest"     : "autofocus_parameters",
+				"nargs"    : 3,
+				"type"     : "int",
+				"default"  : [25, 1, 3],
+				"help"     : "Additional parameters provided to the autofocus function. See MicroscopeControl.py -> MicroscopeController.autoFocus for details. The three values provided for this argument will be used as ndiv, passes and navg arguments. The 'passes' argument in particular can be useful for finding a good focus."
+			}
+		},
+		{
+			"names" : ["-mfe", "--max-focus-error"],
+			"spec"  : {
+				"dest"     : "max_focus_error",
+				"type"     : "float",
+				"default"  : 0.005,
+				"help"     : "This is the maximume root mean squared error that the autofocus is allowed to have when approximating the focus as being linearly related to coordinates. If the error is higher than this the program will stop running before performing a full scan and print an error message."
+			}
+		},
+		{
+			"names" : ["-bi", "--background-images"],
+			"spec"  : {
+				"dest"     : "n_background_images",
+				"type"     : "int",
+				"default"  : 10,
+				"help"     : "The number of randomly positioned images to take when calculating the background."
+			}
+		},
+		{
+			"names" : ["-sft", "--saved-focus-timeout"],
+			"spec"  : {
+				"dest"     : "saved_focus_timeout",
+				"type"     : "int",
+				"default"  : 3600,
+				"help"     : "This program will save the focal point values determined by its auto-focus mechanism when a scan is performed. If another scan is performed soon after this scan with the same exact parameters, they will be loaded and reused, rather than focusing again (which is time consuming). This is useful when a scan needs to be restarted because of an error. This value is the time in seconds that saved focus points are valid for."
+			}
+		},
+		{
+			"names" : ["-nl", "--n-layers-max"],
+			"spec"  : {
+				"dest"     : "n_layers_max",
+				"type"     : "int",
+				"default"  : 3,
+				"help"     : "The maximum number of layers to include in the final database generated by this code."
+			}
+		}
+	]
+}
