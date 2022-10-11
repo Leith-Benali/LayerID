@@ -8,7 +8,7 @@ from layerID_test_new import testing
 
 rng.seed(12345)
 
-def thresh_callback(img, threshold, flake_name, masking, master_cat_file, cluster_count):
+def thresh_callback(img, smallest_flake, flake_name, masking, master_cat_file, cluster_count):
     parser = argparse.ArgumentParser(description='Code for Creating Bounding boxes and circles for contours tutorial.')
     parser.add_argument('--input', help='Path to input image.', default=img)
     args = parser.parse_args()
@@ -33,17 +33,17 @@ def thresh_callback(img, threshold, flake_name, masking, master_cat_file, cluste
     source_window = 'Source'
     cv.namedWindow(source_window)
     cv.imshow(source_window, src)
-
+    
+    threshhold = 0
     canny_output = cv.Canny(src_gray, threshold, threshold * 2)
 
     contours, _ = cv.findContours(canny_output, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     # loop through the contours to get rid of ones that are to small
-    smallest_box = 1000
     result = []
     for i, cnt in enumerate(contours):
         x, y, w, h = cv.boundingRect(contours[i])
-        if w*h > smallest_box:
+        if w*h > smallest_flake:
             result.append(cnt)
     contours = result
 
@@ -85,6 +85,8 @@ def thresh_callback(img, threshold, flake_name, masking, master_cat_file, cluste
         Location of sample image file. (i.e., "...\\RSGR001\\All\\3A1.jpg")
     flake_name : str
         Name of sample image. (i.e., "RSGR001 3A1")
+    smallest_flake : int
+        Size of the smallest flakes to be detected.
     masking : list of list of ints of form [[miny1,maxy1,minx1,maxx1], ...]
         Regions of image to fit background. Indices relative to cropped
         image. (i.e., [[200,-1, 0,175], [0,200, 500,-1], [700,-1, 500,-1]])
@@ -101,7 +103,7 @@ img_directory = "Graphene_Raw_Images"
 for filename in os.listdir(img_directory):
     img = os.path.join(img_directory, filename)
     thresh_callback(img,
-                    threshold=2,
+                    smallest_flake=1000,
                     flake_name="Khang",
                     masking=[[0, 1, 0, 1]],
                     master_cat_file=".\\Monolayer Search\\Graphene_on_SiO2_master_catalog.npz",
