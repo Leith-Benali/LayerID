@@ -34,7 +34,7 @@ def thresh_callback(img, smallest_flake, flake_name, masking, master_cat_file, c
     cv.namedWindow(source_window)
     cv.imshow(source_window, src)
     
-    threshhold = 0
+    threshold = 0
     canny_output = cv.Canny(src_gray, threshold, threshold * 2)
 
     contours, _ = cv.findContours(canny_output, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
