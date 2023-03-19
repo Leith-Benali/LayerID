@@ -11,3 +11,7 @@
 # Master catalog
 # 1. Open master_cataloger.py 
 # 2. Enter the parameters and run the program
+
+# Image Processing
+# 1. Open ImageProcessing.py
+# 2. Enter the parameters and run the program
