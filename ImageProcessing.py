@@ -105,7 +105,7 @@ img_directory = "Test_Images"
 for filename in os.listdir(img_directory):
     img = os.path.join(img_directory, filename)
     thresh_callback(img,
-                    smallest_flake=1000,
+                    smallest_flake=100,
                     flake_name=f"Khang{filename}",
                     masking=[[0, 1, 0, 1]],
                     master_cat_file=".\\Monolayer Search\\Graphene_on_SiO2_master_catalog.npz",
