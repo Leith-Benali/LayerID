@@ -1,18 +1,22 @@
 from __future__ import print_function
 import os
 import cv2 as cv
+import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 import random as rng
 from layerID_test_new import testing
 
+
 rng.seed(12345)
 
-def thresh_callback(img, smallest_flake, flake_name, masking, master_cat_file, cluster_count):
-    parser = argparse.ArgumentParser(description='Code for Creating Bounding boxes and circles for contours tutorial.')
+def thresh_callback(img, smallest_flake, flake_name, img_directory, masking, master_cat_file, cluster_count):
+    parser = argparse.ArgumentParser(description='Code for Creating Bounding boxes for contours.')
     parser.add_argument('--input', help='Path to input image.', default=img)
     args = parser.parse_args()
     src = cv.imread(cv.samples.findFile(args.input))
+
+
 
     #downscale image
     downscale_factor = 4
@@ -23,22 +27,25 @@ def thresh_callback(img, smallest_flake, flake_name, masking, master_cat_file, c
 
     # resize image
     src = cv.resize(src, dim, interpolation=cv.INTER_AREA)
+    cv.imwrite(f"Flakes/downscaled_{flake_name}.jpg", src)
 
     if src is None:
         print('Could not open or find the image:', args.input)
         exit(0)
     # Convert image to gray and blur it
     src_gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
+    cv.imwrite(f"Flakes/grayscale_{flake_name}.jpg", src_gray)
     src_gray = cv.blur(src_gray, (3, 3))
     source_window = 'Source'
     cv.namedWindow(source_window)
     # cv.imshow(source_window, src)
+    cv.imwrite(f"Flakes/bilateral_filter_{flake_name}.jpg", src_gray)
 
 
     threshold = 5
-    canny_output = cv.Canny(src_gray, threshold, threshold * 2)
+    canny_output = cv.Canny(src_gray, threshold, threshold*2)
 
-    contours, _ = cv.findContours(canny_output, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv.findContours(canny_output, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
     # loop through the contours to get rid of ones that are to small
     result = []
@@ -47,6 +54,16 @@ def thresh_callback(img, smallest_flake, flake_name, masking, master_cat_file, c
         if w*h > smallest_flake:
             result.append(cnt)
     contours = result
+
+    mask = np.zeros(src.shape[:2], dtype=np.uint8)
+    # draw filled boundingrects if the contour is large enough
+    for c in contours:
+        x, y, w, h = cv.boundingRect(c)
+        cv.rectangle(mask, (x, y), (x + w, y + h), (255), -1)
+    # cv.imshow(source_window, mask)
+    cv.imwrite(f"Flakes/mask_{flake_name}.jpg", mask)
+
+    contours, _ = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     contours_poly = [None] * len(contours)
     boundRect = [None] * len(contours)
@@ -73,6 +90,7 @@ def thresh_callback(img, smallest_flake, flake_name, masking, master_cat_file, c
         x, y, w, h = cv.boundingRect(contours[i])
         args = {'img_file': img,
                 'flake_name': flake_name + str(i),
+                'file_dir' : img_directory,
                 'crop': [downscale_factor * y, downscale_factor * (y + h), downscale_factor * x, downscale_factor * (x + w)],
                 'masking': masking,
                 'master_cat_file': master_cat_file,
@@ -89,9 +107,6 @@ def thresh_callback(img, smallest_flake, flake_name, masking, master_cat_file, c
         Name of sample image. (i.e., "RSGR001 3A1")
     smallest_flake : int
         Size of the smallest flakes to be detected.
-    masking : list of list of ints of form [[miny1,maxy1,minx1,maxx1], ...]
-        Regions of image to fit background. Indices relative to cropped
-        image. (i.e., [[200,-1, 0,175], [0,200, 500,-1], [700,-1, 500,-1]])
     master_cat_file : str
         Location of master catalog npz file for the same material/substrate as
         sample. (i.e., "...\\Graphene_on_SiO2_master_catalog.npz")
@@ -107,7 +122,8 @@ for filename in os.listdir(img_directory):
     thresh_callback(img,
                     smallest_flake=100,
                     flake_name=f"Khang{filename}",
-                    masking=[[0, 1, 0, 1]],
+                    img_directory=img_directory,
                     master_cat_file=".\\Monolayer Search\\Graphene_on_SiO2_master_catalog.npz",
-                    cluster_count=5,)
+                    cluster_count=5,
+                    masking=[[0,1,0,1]])
 

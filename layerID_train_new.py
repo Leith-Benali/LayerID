@@ -12,6 +12,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sklearn.mixture import GaussianMixture as GMM
 from sklearn.cluster import MeanShift, estimate_bandwidth
+from background import stack_opened, residual_img
+from utils import return_opened
 
 def line2d(x, y, coeffs=[1]*3, return_coeff=False):
     """Returns the result of a 2D quadratic, or returns the coefficients"""
@@ -65,7 +67,7 @@ def confellipsoid(rad, cent_x, cent_y, cent_z, covariance, res=20, conf=7.815):
     return elli
 
 
-def training(img_file, flake_name, crop, masking, out_file,
+def training(img_file, flake_name, file_dir, crop, masking, out_file,
              comp_rate=100, density=8, min_clusters=0,
              max_clusters=100, convergence_param=0.0001):
     """
@@ -78,6 +80,8 @@ def training(img_file, flake_name, crop, masking, out_file,
         Location of sample image file. (i.e., "...\\RSGR001\\All\\3A1.jpg")
     flake_name : str
         Name of sample image. (i.e., "RSGR001 3A1")
+    file_dir : str
+        Location of images to use for median background subtraction
     crop : list of ints of form [miny, maxy, minx, maxx]
         Region to crop sample image to. (i.e., [1750,2550, 2100,2850])
     masking : list of list of ints of form [[miny1,maxy1,minx1,maxx1], ...]
@@ -103,7 +107,19 @@ def training(img_file, flake_name, crop, masking, out_file,
 
         ## Import and pre-processing
     ## Image import
-    img = cv2.cvtColor(cv2.imread(img_file), cv2.COLOR_BGR2RGB)
+    individual_loc = img_file
+
+    # Median filter background subtraction
+    all_opened = return_opened(file_dir)
+    print(type(all_opened[0]))
+    stacked = stack_opened(all_opened)
+    opened_img, residual, type_ = residual_img(stacked, individual_loc)
+    width = int(cv2.imread(img_file).shape[1])
+    height = int(cv2.imread(img_file).shape[0])
+    dim = (width, height)
+    resized = cv2.resize(residual, dim, interpolation=cv2.INTER_AREA)
+
+    img = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
 
     ## Bilateral filtering
     #img_bl = (img).astype(np.float32)/256
@@ -351,6 +367,7 @@ def training(img_file, flake_name, crop, masking, out_file,
 args = {'img_file': ".\\whatever1\\0000_-5.5010_2.9079.png",
         'flake_name': "Khang",
         'crop': [0,-1,0,-1],
+        'file_dir' : "Test_Images",
         'masking': [[0,0,0,0]],
         'out_file': ".\\Monolayer Search\\Graphene_on_SiO2_catalog.npz",
         'min_clusters': 6, 'max_clusters': 12}

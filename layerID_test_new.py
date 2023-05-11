@@ -10,6 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from sklearn.mixture import GaussianMixture as GMM
+from background import stack_opened, residual_img
+from utils import return_opened
 
 
 def line2d(x, y, coeffs=[1]*3, return_coeff=False):
@@ -52,7 +54,7 @@ def discreteCB(fig, ax, img, flake_name):
     cbar.ax.set_yticklabels([ii for ii in range(cluster_count)])
     plt.savefig(f'.\\Flakes\\accuracy_test_{flake_name}.png')
 
-def testing(img_file, flake_name, crop, masking,
+def testing(img_file, flake_name, file_dir, crop, masking,
             master_cat_file, cluster_count, comp_rate=300):
     """
     Identify thickness of flake "img_file" using "master_cat_file"
@@ -82,22 +84,26 @@ def testing(img_file, flake_name, crop, masking,
 
         ## Import and pre-processing
     ## Image import
-    img = cv2.cvtColor(cv2.imread(img_file), cv2.COLOR_BGR2RGB)
-    # bg = cv2.cvtColor(cv2.imread(background), cv2.COLOR_BGR2RGB)
+    individual_loc = img_file
+
+    # Median filter background subtraction
+    all_opened = return_opened(file_dir)
+    print(type(all_opened[0]))
+    stacked = stack_opened(all_opened)
+    opened_img, residual, type_ = residual_img(stacked, individual_loc)
+    width = int(cv2.imread(img_file).shape[1])
+    height = int(cv2.imread(img_file).shape[0])
+    dim = (width, height)
+    resized = cv2.resize(residual, dim, interpolation = cv2.INTER_AREA)
+
+    img = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
 
     ## Bilateral filtering
     imgc = img[crop[0]:crop[1], crop[2]:crop[3]]
-    # bgc = bg[crop[0]:crop[1], crop[2]:crop[3]]
     img_bl = (imgc).astype(np.float32) / 256
-    # bg_bl = (bgc).astype(np.float32) / 256
     for ii in range(1):
         img_bl = cv2.bilateralFilter(img_bl, 1, 1, 1)
-        # bg_bl = cv2.bilateralFilter(bg_bl, 1, 1, 1)
 
-    # img_bl = img_bl - bg_bl
-    # _min = img_bl.min()
-    # _max = img_bl.max()
-    # img_bl = (((img_bl - _min) / (_max - _min)) * 255).astype(np.uint8)
 
     mask = np.ones(img_bl[:, :, 0].shape)
     for reg in masking:
@@ -141,6 +147,7 @@ def testing(img_file, flake_name, crop, masking,
     for ii in range(1):
         img_bl2 = cv2.bilateralFilter(img_bl2,1,0.5,1)
 
+
     # print('Manually inspect background reduction, then close figures.')
     # plt.figure()
     # plt.imshow(img_bl2)
@@ -154,6 +161,7 @@ def testing(img_file, flake_name, crop, masking,
         comp = 1
     img_proc = img_bl2[::comp,::comp]
     imgc_proc = imgc[::comp,::comp]
+    # cv2.imwrite(f"Flakes/bilateralFiltered_{flake_name}.jpg", imgc_proc)
     y_size, x_size, _ = img_proc.shape
 
     R = img_proc[:,:,0].flatten()
