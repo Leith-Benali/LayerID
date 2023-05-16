@@ -102,7 +102,7 @@ def thresh_callback(img, smallest_flake, flake_name, img_directory, masking, mas
     Parameters
     ----------
     img_directory : str
-        Location of sample image file. (i.e., "...\\RSGR001\\All\\3A1.jpg")
+        Location of sample images. (i.e., "Test_Images/")
     flake_name : str
         Name of sample image. (i.e., "RSGR001 3A1")
     smallest_flake : int
@@ -116,7 +116,7 @@ def thresh_callback(img, smallest_flake, flake_name, img_directory, masking, mas
     """
 
 # Enter the parameters required by the processImage function
-img_directory = "Test_Images"
+img_directory = "Test_Images/"
 for filename in os.listdir(img_directory):
     img = os.path.join(img_directory, filename)
     thresh_callback(img,
