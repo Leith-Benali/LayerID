@@ -367,11 +367,11 @@ def training(img_file, flake_name, file_dir, crop, masking, out_file,
 
     processWithClustering(img_proc)
 
-args = {'img_file': ".\\Test_Images\\trainingflake.png",
+args = {'img_file': ".\\Test_Images\\trainingflake2.jpg",
         'flake_name': "Khang",
         'crop': [0,-1,0,-1],
-        'file_dir' : "Graphene_Scan/",
-        'masking': [[0,40,0,60], [60,-1,130,-1]],
+        'file_dir' : "Graphene_Scan",
+        'masking': [[0,50,0,115], [255,-1,240,-1], [280, -1, 0, 70]],
         'out_file': ".\\Monolayer Search\\Graphene_on_SiO2_catalog.npz",
         'min_clusters': 6, 'max_clusters': 12}
 
