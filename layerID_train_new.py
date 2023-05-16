@@ -113,13 +113,16 @@ def training(img_file, flake_name, file_dir, crop, masking, out_file,
     all_opened = return_opened(file_dir)
     print(type(all_opened[0]))
     stacked = stack_opened(all_opened)
-    opened_img, residual, type_ = residual_img(stacked, individual_loc)
+    opened_img, background, residual, type_ = residual_img(stacked, individual_loc)
     width = int(cv2.imread(img_file).shape[1])
     height = int(cv2.imread(img_file).shape[0])
     dim = (width, height)
     resized = cv2.resize(residual, dim, interpolation=cv2.INTER_AREA)
 
     img = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+
+    # To disable background subtraction, uncomment the line below, and comment the lines above under # Median filter background subtraction
+    # img = cv2.cvtColor(cv2.imread(img_file), cv2.COLOR_BGR2RGB)
 
     ## Bilateral filtering
     #img_bl = (img).astype(np.float32)/256
@@ -364,11 +367,11 @@ def training(img_file, flake_name, file_dir, crop, masking, out_file,
 
     processWithClustering(img_proc)
 
-args = {'img_file': ".\\whatever1\\0000_-5.5010_2.9079.png",
+args = {'img_file': ".\\Test_Images\\trainingflake.png",
         'flake_name': "Khang",
         'crop': [0,-1,0,-1],
-        'file_dir' : "Test_Images",
-        'masking': [[0,0,0,0]],
+        'file_dir' : "Graphene_Scan/",
+        'masking': [[0,40,0,60], [60,-1,130,-1]],
         'out_file': ".\\Monolayer Search\\Graphene_on_SiO2_catalog.npz",
         'min_clusters': 6, 'max_clusters': 12}
 

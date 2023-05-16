@@ -90,13 +90,16 @@ def testing(img_file, flake_name, file_dir, crop, masking,
     all_opened = return_opened(file_dir)
     print(type(all_opened[0]))
     stacked = stack_opened(all_opened)
-    opened_img, residual, type_ = residual_img(stacked, individual_loc)
+    opened_img, background, residual, type_ = residual_img(stacked, individual_loc)
     width = int(cv2.imread(img_file).shape[1])
     height = int(cv2.imread(img_file).shape[0])
     dim = (width, height)
     resized = cv2.resize(residual, dim, interpolation = cv2.INTER_AREA)
 
     img = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+
+    # To disable background subtraction, uncomment the line below, and comment the lines above under # Median filter background subtraction
+    # img = cv2.cvtColor(cv2.imread(img_file), cv2.COLOR_BGR2RGB)
 
     ## Bilateral filtering
     imgc = img[crop[0]:crop[1], crop[2]:crop[3]]
